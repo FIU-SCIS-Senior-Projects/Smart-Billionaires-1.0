@@ -112,6 +112,7 @@ bool CSampleExpert::Init(void)
    m_symbol.Name(Symbol());                  // symbol
    m_trade.SetExpertMagicNumber(MACD_MAGIC); // magic
    m_trade.SetMarginMode();
+   m_trade.SetTypeFillingBySymbol(Symbol());
 //--- tuning for 3 or 5 digits
    int digits_adjust=1;
    if(m_symbol.Digits()==3 || m_symbol.Digits()==5)

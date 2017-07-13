@@ -34,7 +34,7 @@ double TradeSizeOptimized(void)
    if(margin<=0.0)
       return(0.0);
 
-   double lot=NormalizeDouble(AccountInfoDouble(ACCOUNT_FREEMARGIN)*MaximumRisk/margin,2);
+   double lot=NormalizeDouble(AccountInfoDouble(ACCOUNT_MARGIN_FREE)*MaximumRisk/margin,2);
 //--- calculate number of losses orders without a break
    if(DecreaseFactor>0)
      {
@@ -54,6 +54,9 @@ double TradeSizeOptimized(void)
            }
          //--- check symbol
          if(HistoryDealGetString(ticket,DEAL_SYMBOL)!=_Symbol)
+            continue;
+         //--- check Expert Magic number
+         if(HistoryDealGetInteger(ticket,DEAL_MAGIC)!=MA_MAGIC)
             continue;
          //--- check profit
          double profit=HistoryDealGetDouble(ticket,DEAL_PROFIT);
@@ -146,9 +149,9 @@ void CheckForClose(void)
    bool signal=false;
    long type=PositionGetInteger(POSITION_TYPE);
 
-   if(type==(long)POSITION_TYPE_BUY   && rt[0].open>ma[0] && rt[0].close<ma[0])
+   if(type==(long)POSITION_TYPE_BUY && rt[0].open>ma[0] && rt[0].close<ma[0])
       signal=true;
-   if(type==(long)POSITION_TYPE_SELL  && rt[0].open<ma[0] && rt[0].close>ma[0])
+   if(type==(long)POSITION_TYPE_SELL && rt[0].open<ma[0] && rt[0].close>ma[0])
       signal=true;
 //--- additional checking
    if(signal)
@@ -164,7 +167,7 @@ void CheckForClose(void)
 bool SelectPosition()
   {
    bool res=false;
-//---
+//--- check position in Hedging mode
    if(ExtHedging)
      {
       uint total=PositionsTotal();
@@ -178,9 +181,15 @@ bool SelectPosition()
            }
         }
      }
+//--- check position in Netting mode
    else
-      res=PositionSelect(_Symbol);
-//---
+     {
+      if(!PositionSelect(_Symbol))
+         return(false);
+      else
+         return(PositionGetInteger(POSITION_MAGIC)==MA_MAGIC); //---check Magic number
+     }
+//--- result for Hedging mode
    return(res);
   }
 //+------------------------------------------------------------------+
@@ -192,6 +201,7 @@ int OnInit(void)
    ExtHedging=((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE)==ACCOUNT_MARGIN_MODE_RETAIL_HEDGING);
    ExtTrade.SetExpertMagicNumber(MA_MAGIC);
    ExtTrade.SetMarginMode();
+   ExtTrade.SetTypeFillingBySymbol(Symbol());
 //--- Moving Average indicator
    ExtHandle=iMA(_Symbol,_Period,MovingPeriod,MovingShift,MODE_SMA,PRICE_CLOSE);
    if(ExtHandle==INVALID_HANDLE)

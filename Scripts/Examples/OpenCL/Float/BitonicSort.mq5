@@ -82,19 +82,12 @@ bool QuickSort_CPU(float &data_array[],ulong &time_cpu)
 //+------------------------------------------------------------------+
 //| BitonicSort_GPU                                                  |
 //+------------------------------------------------------------------+
-bool BitonicSort_GPU(float &data_array[],ulong &time_gpu)
+bool BitonicSort_GPU(COpenCL &OpenCL,float &data_array[],ulong &time_gpu)
   {
-//---
    int data_count=ArraySize(data_array);
    if(data_count<=1)
       return(false);
-//--- OpenCL
-   COpenCL OpenCL;
-   if(!OpenCL.Initialize(cl_program,true))
-     {
-      PrintFormat("Error in OpenCL initialization. Error code=%d",GetLastError());
-      return(false);
-     }
+
    OpenCL.SetKernelsCount(1);
    OpenCL.KernelCreate(0,"BitonicSort_GPU");
 //--- create buffers
@@ -144,32 +137,14 @@ bool BitonicSort_GPU(float &data_array[],ulong &time_gpu)
 //--- GPU calculation finish
    time_gpu=ulong((GetMicrosecondCount()-time_gpu)/1000);
    PrintFormat("Bitonic sort finished. Total stages=%d, total passes=%d",stages_total,passes_total);
-//--- remove OpenCL objects
-   OpenCL.Shutdown();
 //---
    return(true);
   }
 //+------------------------------------------------------------------+
 //| PrepareDataArray                                                 |
 //+------------------------------------------------------------------+
-bool PrepareDataArray(float &data[],int &data_count)
+bool PrepareDataArray(ulong global_memory_size,float &data[],int &data_count)
   {
-   int cl_ctx;
-//--- initialize OpenCL context
-   if((cl_ctx=CLContextCreate(CL_USE_GPU_ONLY))==INVALID_HANDLE)
-     {
-      data_count=0;
-      Print("OpenCL not found. Error code=",GetLastError());
-      return(false);
-     }
-//--- get GPU global memory size
-   long global_memory_size=CLGetInfoInteger(cl_ctx,CL_DEVICE_GLOBAL_MEM_SIZE);
-   CLContextFree(cl_ctx);
-   if(global_memory_size==-1)
-     {
-      Print("Error in request of CL_DEVICE_GLOBAL_MEM_SIZE. Error code=",GetLastError());
-      return(false);
-     }
    int pwr_max=(int)(MathLog(global_memory_size/sizeof(float))/MathLog(2));
    int pwr=(int)MathMax(15,pwr_max-4);
    data_count=(int)MathPow(2,pwr);
@@ -189,10 +164,23 @@ bool PrepareDataArray(float &data[],int &data_count)
 //+------------------------------------------------------------------+
 void OnStart()
   {
+//--- OpenCL
+   COpenCL OpenCL;
+   if(!OpenCL.Initialize(cl_program,true))
+     {
+      PrintFormat("Error in OpenCL initialization. Error code=%d",GetLastError());
+      return;
+     }
+   long global_memory_size=0;
+   if(!OpenCL.GetGlobalMemorySize(global_memory_size))
+     {
+      Print("Error in request of global memory size. Error code=",GetLastError());
+      return;
+     }
    float data_cpu[];
    int data_count;
 //--- prepare array with random values
-   if(PrepareDataArray(data_cpu,data_count)==false)
+   if(PrepareDataArray(global_memory_size,data_cpu,data_count)==false)
       return;
 //--- copy array values for sorting on GPU
    float data_gpu[];
@@ -204,8 +192,11 @@ void OnStart()
       return;
 //--- Bitonic sort values using GPU
    ulong time_gpu=0;
-   if(!BitonicSort_GPU(data_gpu,time_gpu))
+   if(!BitonicSort_GPU(OpenCL,data_gpu,time_gpu))
       return;
+//--- remove OpenCL objects
+   OpenCL.Shutdown();
+
 //--- calculate CPU/GPU ratio
    double CPU_GPU_ratio=0;
    if(time_gpu!=0)

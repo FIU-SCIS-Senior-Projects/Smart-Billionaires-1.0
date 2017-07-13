@@ -486,7 +486,7 @@ static CArrayObj *CRuleParser::ParseLexems(const string rule,CList *&lexems)
    for(int i=0; i<ArraySize(words); i++)
      {
       string word=words[i];
-      CLexem *lexem;
+      CObject *lexem = NULL;
       if(TryGetValue(lexems,word,lexem))
         {
          expressions.Add(lexem);

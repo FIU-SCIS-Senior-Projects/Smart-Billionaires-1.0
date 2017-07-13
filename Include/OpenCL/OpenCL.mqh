@@ -31,6 +31,8 @@ public:
    int               GetProgram(void)    const { return(m_program);             }
    int               GetKernel(const int kernel_index) const;
    string            GetKernelName(const int kernel_index) const;
+   //--- global memory size
+   bool              GetGlobalMemorySize(long &global_memory_size);
    //--- check support working with double
    bool              SupportDouble(void) const { return(m_support_cl_khr_fp64); }
    //--- initialization and shutdown
@@ -98,6 +100,20 @@ string COpenCL::GetKernelName(const int kernel_index) const
       return("");
 //---
    return m_kernel_names[kernel_index];
+  }
+//+------------------------------------------------------------------+
+//| GetGlobalMemorySize                                              |
+//+------------------------------------------------------------------+
+bool COpenCL::GetGlobalMemorySize(long &global_memory_size)
+  {
+   if(m_context==INVALID_HANDLE)
+      return(false);
+//--- get global memory size
+   global_memory_size=CLGetInfoInteger(m_context,CL_DEVICE_GLOBAL_MEM_SIZE);
+   if(global_memory_size==-1)
+      return(false);
+//---
+   return(true);
   }
 //+------------------------------------------------------------------+
 //| Initialize                                                       |

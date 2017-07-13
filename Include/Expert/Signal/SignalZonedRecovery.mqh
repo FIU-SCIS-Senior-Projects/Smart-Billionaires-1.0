@@ -13,6 +13,35 @@
 #include <Indicators\Oscilators.mqh>
 #include <iHeiken_Ashi.mqh>
 #include <iRenko.mqh>
+
+//+------------------------------------------------------------------+
+//| definitions                                                      |
+//+------------------------------------------------------------------+
+   #define  BAR_COUNT   3
+//--- number of the indicator buffer for storage Open
+   #define  HA_OPEN     0
+//--- number of the indicator buffer for storage High
+   #define  HA_HIGH     1
+//--- number of the indicator buffer for storage Low
+   #define  HA_LOW      2
+//--- number of the indicator buffer for storage Close
+   #define  HA_CLOSE    3
+   
+//+------------------------------------------------------------------+
+//| enumerations                                                     |
+//+------------------------------------------------------------------+
+//--- colors of bars on market charts
+enum ENUM_BAR_COLOR
+  {
+   BAR_RED                    =0,
+   BAR_GREEN                  =10
+  };
+//--- current mode the expert is using to exit the market
+enum ENUM_EXIT_MODE
+  {
+   EXIT_MODE_DEFAULT         =0,
+   EXIT_MODE_ZONERECOVERY    =20
+  };
 //+------------------------------------------------------------------+
 
 class CSignalZonedRecovery : public CExpertSignal
@@ -32,25 +61,22 @@ protected:
    int               m_ma_shift;       // the "time shift" parameter of the indicator
    ENUM_MA_METHOD    m_ma_method;      // the "method of averaging" parameter of the indicator
    ENUM_APPLIED_PRICE m_ma_applied;    // the "object of averaging" parameter of the indicator
-       
+   ENUM_EXIT_MODE    m_current_exitMode;   // the current mode the expert is using to exit the market   
+     
 public:
                      CSignalZonedRecovery(void);
                     ~CSignalZonedRecovery(void);
-   bool              CheckMarketCondition(void); 
+   bool              CheckMarketCondition(void);
+   ENUM_BAR_COLOR    CheckHeiken(void); //Get color of last bar on the Heiken_Ashi Chart 
    virtual bool      InitIndicators(CIndicators *indicators);
+   void              ExitMode(ENUM_EXIT_MODE mode)         { m_current_exitMode = mode; }
+   ENUM_EXIT_MODE    GetExitMode(void)                { return(m_current_exitMode); }
    
 protected:
    bool InitHeiken(CIndicators *indicators);
    bool InitRenko(CIndicators *indicators); 
    bool InitMA(CIndicators *indicators);
    bool InitMACD(CIndicators *indicators);
-   
-   double            Main(int ind)                     { return(MACD.Main(ind));      }
-   double            Signal(int ind)                   { return(MACD.Signal(ind));    }
-   double            DiffMain(int ind)                 { return(Main(ind)-Main(ind+1)); }
-   double            MA(int ind)                         { return(m_ma.Main(ind));     }
-   double            DiffCloseMA(int ind)                { return(Close(ind)-MA(ind)); }
-                        
 };
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
@@ -62,7 +88,8 @@ CSignalZonedRecovery::CSignalZonedRecovery(void): m_period_fast(12),
                                                   m_ma_period(12),
                                                   m_ma_shift(0),
                                                   m_ma_method(MODE_SMA),
-                                                  m_ma_applied(PRICE_CLOSE)
+                                                  m_ma_applied(PRICE_CLOSE),
+                                                  m_current_exitMode(EXIT_MODE_DEFAULT)
 {
 }
 //+------------------------------------------------------------------+
@@ -71,25 +98,14 @@ CSignalZonedRecovery::CSignalZonedRecovery(void): m_period_fast(12),
 CSignalZonedRecovery::~CSignalZonedRecovery(void)
   {
   }
+  
 //+------------------------------------------------------------------+
-//| Check Market Conditions                                          |
+//| Get color of last bar on the Heiken_Ashi Chart                   |
 //+------------------------------------------------------------------+
-bool CSignalZonedRecovery::CheckMarketCondition(void)
-{
-   int idx = StartIndex();
+ENUM_BAR_COLOR CSignalZonedRecovery::CheckHeiken(void)
+  {
    int hHeiken_Ashi = heiken.Handle();
-   int hRenko = renko.Handle();
-   
    //--- to check the conditions we need the last three bars
-#define  BAR_COUNT   3
-//--- number of the indicator buffer for storage Open
-#define  HA_OPEN     0
-//--- number of the indicator buffer for storage High
-#define  HA_HIGH     1
-//--- number of the indicator buffer for storage Low
-#define  HA_LOW      2
-//--- number of the indicator buffer for storage Close
-#define  HA_CLOSE    3
 
    double   haOpen[BAR_COUNT],haHigh[BAR_COUNT],haLow[BAR_COUNT],haClose[BAR_COUNT];
       
@@ -103,9 +119,34 @@ bool CSignalZonedRecovery::CheckMarketCondition(void)
       return(false);
      }
    bool result = haClose[BAR_COUNT-2] > haOpen[BAR_COUNT-2];
+   return (result) ? BAR_GREEN : BAR_RED;
+  }
+  
+//+------------------------------------------------------------------+
+//| Check Market Conditions                                          |
+//|                                                                  |
+//| 1. Make sure last bar on the heiken ashi chart is green.         |
+//| 2. Check the slope of the EMA Trend.                             |
+//| 3. Check the color of the last bar of the Renko chart.           |
+//| 4. Validate the renko chart with the MACD.                       |
+//+------------------------------------------------------------------+
+bool CSignalZonedRecovery::CheckMarketCondition(void)
+{
+   int idx = StartIndex();
+   int hRenko = renko.Handle();
+   //--- to check the conditions we need the last three bars
+   double   haOpen[BAR_COUNT],haHigh[BAR_COUNT],haLow[BAR_COUNT],haClose[BAR_COUNT];
+   
+//--- Check Heiken_Ashi Chart
+   ENUM_BAR_COLOR heikenBar = CheckHeiken();
+   bool result = heikenBar == BAR_GREEN;
    
 //--- Check EMA Trend
-   result = result && (DiffCloseMA(idx) >= 0.0 && IS_PATTERN_USAGE(0));
+   int emaHandle = m_ma.Handle();
+   CopyBuffer(emaHandle,0,0,BAR_COUNT,haOpen);
+   
+   double trend = haOpen[idx+1] - haOpen[idx];
+   result = result && (trend >= 0.0);
    
 //-- Check Renko Chart
    if(CopyBuffer(hRenko,HA_OPEN,0,BAR_COUNT,haOpen)!=BAR_COUNT
@@ -113,13 +154,18 @@ bool CSignalZonedRecovery::CheckMarketCondition(void)
       || CopyBuffer(hRenko,HA_LOW,0,BAR_COUNT,haLow)!=BAR_COUNT
       || CopyBuffer(hRenko,HA_CLOSE,0,BAR_COUNT,haClose)!=BAR_COUNT)
      {
-      Print("CopyBuffer from Heiken_Ashi failed, no data");
+      Print("CopyBuffer from Renko failed, no data");
       return(false);
      }
-   result = result && (haClose[BAR_COUNT-2] > haOpen[BAR_COUNT-2]);
+   ENUM_BAR_COLOR renkoBar = (haClose[BAR_COUNT-2] > haOpen[BAR_COUNT-2]) ? BAR_GREEN : BAR_RED;
+   result = result && (renkoBar == BAR_GREEN);
 
 //-- Validate with MACD
-   result = result && (DiffMain(idx)>0.0 && IS_PATTERN_USAGE(0)); 
+   int macdHandle = MACD.Handle();
+   CopyBuffer(macdHandle,0,0,BAR_COUNT,haOpen);
+   double macdSlope = haOpen[idx+1] - haOpen[idx];
+   printf("The heiken bar is: %s; The slope of EMA trend is: %f; The renko bar is: %s; The MACD is rising?: %d",EnumToString(heikenBar),trend,EnumToString(renkoBar),macdSlope>0.0);
+   result = result && (macdSlope > 0.0);
    return result;
 }
 //+------------------------------------------------------------------+

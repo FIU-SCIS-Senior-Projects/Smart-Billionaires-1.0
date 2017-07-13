@@ -512,6 +512,7 @@ void AddSugenoFuzzyRule(CSugenoFuzzySystem *fs,CFuzzyVariable *fv1,CFuzzyVariabl
                         const string value1,const string value2,const string result)
   {
    CSugenoFuzzyRule *rule=fs.EmptyRule();
+   rule.Conclusion(new CSingleCondition());
    rule.Condition().Op(OperatorType::And);
    rule.Condition().ConditionsList().Add(rule.CreateCondition(fv1, fv1.GetTermByName(value1)));
    rule.Condition().ConditionsList().Add(rule.CreateCondition(fv2, fv2.GetTermByName(value2)));

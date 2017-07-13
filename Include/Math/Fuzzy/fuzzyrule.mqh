@@ -76,14 +76,14 @@ public:
                      CSingleCondition(INamedVariable *var,INamedValue *term,bool not);
                     ~CSingleCondition(void);
    //--- methods gets or sets the varriable
-   INamedVariable   *Var(void)                     { return(m_var); }
-   void              Var(INamedVariable *&value)   { m_var=value;   }
+   INamedVariable   *Var(void) { return(m_var); }
+   void              Var(INamedVariable *value) { m_var=value;   }
    //--- methods gets or sets mark "Is MF inverted"
    bool              Not(void)      { return(m_not); }
    void              Not(bool not)  { m_not=not;     }
    //--- methods gets or sets term in expression
-   INamedValue      *Term(void)                 { return(m_term); }
-   void              Term(INamedValue *&value)  { m_term=value;   }
+   INamedValue      *Term(void) { return(m_term); }
+   void              Term(INamedValue *value) { m_term=value;   }
    //--- method to check type
    virtual bool      IsTypeOf(EnCondition type) { return(type==TYPE_CLASS_SingleCondition); }
   };
@@ -331,7 +331,8 @@ CMamdaniFuzzyRule::CMamdaniFuzzyRule(void)
 //+------------------------------------------------------------------+ 
 CMamdaniFuzzyRule::~CMamdaniFuzzyRule(void)
   {
-   delete m_mamdani_conclusion;
+   if(CheckPointer(m_mamdani_conclusion)==POINTER_DYNAMIC)
+      delete m_mamdani_conclusion;
   }
 //+------------------------------------------------------------------+
 //| Fuzzy rule for Sugeno fuzzy system                               |
@@ -357,13 +358,13 @@ public:
 //+-------------------------- ---------------------------------------+
 CSugenoFuzzyRule::CSugenoFuzzyRule(void)
   {
-   m_sugeno_conclusion=new CSingleCondition();
   }
 //+------------------------------------------------------------------+
 //| Destructor                                                       |
 //+------------------------------------------------------------------+ 
 CSugenoFuzzyRule::~CSugenoFuzzyRule(void)
   {
-   delete m_sugeno_conclusion;
+   if(CheckPointer(m_sugeno_conclusion)==POINTER_DYNAMIC)
+      delete m_sugeno_conclusion;
   }
 //+------------------------------------------------------------------+
