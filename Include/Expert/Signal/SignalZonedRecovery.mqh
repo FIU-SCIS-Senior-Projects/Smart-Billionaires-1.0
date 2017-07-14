@@ -68,6 +68,8 @@ public:
                     ~CSignalZonedRecovery(void);
    bool              CheckMarketCondition(void);
    ENUM_BAR_COLOR    CheckHeiken(void); //Get color of last bar on the Heiken_Ashi Chart 
+   ENUM_BAR_COLOR    CheckRenko(void); //Get color of last bar on the Heiken_Ashi Chart
+   bool              CheckMACD(void); //Get direction from MACD Chart
    virtual bool      InitIndicators(CIndicators *indicators);
    void              ExitMode(ENUM_EXIT_MODE mode)         { m_current_exitMode = mode; }
    ENUM_EXIT_MODE    GetExitMode(void)                { return(m_current_exitMode); }
@@ -121,7 +123,48 @@ ENUM_BAR_COLOR CSignalZonedRecovery::CheckHeiken(void)
    bool result = haClose[BAR_COUNT-2] > haOpen[BAR_COUNT-2];
    return (result) ? BAR_GREEN : BAR_RED;
   }
-  
+
+//+------------------------------------------------------------------+
+//| Get color of last bar on the Renko Chart                   |
+//+------------------------------------------------------------------+
+ENUM_BAR_COLOR CSignalZonedRecovery::CheckRenko(void)
+  {
+   int hRenko = renko.Handle();
+   //--- to check the conditions we need the last three bars
+
+   double   haOpen[BAR_COUNT],haHigh[BAR_COUNT],haLow[BAR_COUNT],haClose[BAR_COUNT];
+      
+//--- check Heiken Ashi Chart  
+   if(CopyBuffer(hRenko,HA_OPEN,0,BAR_COUNT,haOpen)!=BAR_COUNT
+      || CopyBuffer(hRenko,HA_HIGH,0,BAR_COUNT,haHigh)!=BAR_COUNT
+      || CopyBuffer(hRenko,HA_LOW,0,BAR_COUNT,haLow)!=BAR_COUNT
+      || CopyBuffer(hRenko,HA_CLOSE,0,BAR_COUNT,haClose)!=BAR_COUNT)
+     {
+      Print("CopyBuffer from Renko failed, no data");
+      return(false);
+     }
+   ENUM_BAR_COLOR renkoBar = (haClose[BAR_COUNT-2] > haOpen[BAR_COUNT-2]) ? BAR_GREEN : BAR_RED;
+   return renkoBar;
+  }
+
+//+------------------------------------------------------------------+
+//| Get color of last bar on the Renko Chart                   |
+//+------------------------------------------------------------------+
+bool CSignalZonedRecovery::CheckMACD(void)
+  {
+   int macdHandle = MACD.Handle();
+   //--- to check the conditions we need the last three bars
+
+   double   haOpen[BAR_COUNT],haHigh[BAR_COUNT],haLow[BAR_COUNT],haClose[BAR_COUNT];
+      
+//--- check Heiken Ashi Chart  
+   CopyBuffer(macdHandle,0,0,BAR_COUNT,haOpen);// Main
+   CopyBuffer(macdHandle,1,0,BAR_COUNT,haClose); // Signal
+   double macdSlope = haOpen[BAR_COUNT-1] - haOpen[BAR_COUNT-2];
+   bool result = (macdSlope > 0.0) && (haOpen[BAR_COUNT-2] > haClose[BAR_COUNT-2]);
+   return result;
+  }
+    
 //+------------------------------------------------------------------+
 //| Check Market Conditions                                          |
 //|                                                                  |
@@ -143,29 +186,17 @@ bool CSignalZonedRecovery::CheckMarketCondition(void)
    
 //--- Check EMA Trend
    int emaHandle = m_ma.Handle();
-   CopyBuffer(emaHandle,0,0,BAR_COUNT,haOpen);
+   CopyBuffer(emaHandle,0,0,BAR_COUNT,haOpen); 
    
    double trend = haOpen[idx+1] - haOpen[idx];
    result = result && (trend >= 0.0);
    
 //-- Check Renko Chart
-   if(CopyBuffer(hRenko,HA_OPEN,0,BAR_COUNT,haOpen)!=BAR_COUNT
-      || CopyBuffer(hRenko,HA_HIGH,0,BAR_COUNT,haHigh)!=BAR_COUNT
-      || CopyBuffer(hRenko,HA_LOW,0,BAR_COUNT,haLow)!=BAR_COUNT
-      || CopyBuffer(hRenko,HA_CLOSE,0,BAR_COUNT,haClose)!=BAR_COUNT)
-     {
-      Print("CopyBuffer from Renko failed, no data");
-      return(false);
-     }
-   ENUM_BAR_COLOR renkoBar = (haClose[BAR_COUNT-2] > haOpen[BAR_COUNT-2]) ? BAR_GREEN : BAR_RED;
+   ENUM_BAR_COLOR renkoBar = CheckRenko();
    result = result && (renkoBar == BAR_GREEN);
 
 //-- Validate with MACD
-   int macdHandle = MACD.Handle();
-   CopyBuffer(macdHandle,0,0,BAR_COUNT,haOpen);
-   double macdSlope = haOpen[idx+1] - haOpen[idx];
-   printf("The heiken bar is: %s; The slope of EMA trend is: %f; The renko bar is: %s; The MACD is rising?: %d",EnumToString(heikenBar),trend,EnumToString(renkoBar),macdSlope>0.0);
-   result = result && (macdSlope > 0.0);
+   result = result && CheckMACD();
    return result;
 }
 //+------------------------------------------------------------------+
