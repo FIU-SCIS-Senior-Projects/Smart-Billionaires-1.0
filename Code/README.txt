@@ -26,5 +26,3 @@ Using Strategy tester and running the Expert Adviser:
 2. A helpful guide to run the test can be found here: https://www.metatrader5.com/en/terminal/help/testing
 3. The server used for demo in this project is access.metrader5.com:443. This server allows hedging and trading. 
    Any server with these characteristics can be used, the default server, AMPGlobalClearing is not compatable.
-
-
