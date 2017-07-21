@@ -39,8 +39,9 @@ enum ENUM_BAR_COLOR
 //--- current mode the expert is using to exit the market
 enum ENUM_EXIT_MODE
   {
-   EXIT_MODE_DEFAULT         =0,
-   EXIT_MODE_ZONERECOVERY    =20
+   EXIT_MODE_DEFAULT         =0, // Exit Rule 1
+   EXIT_MODE_ZONERECOVERY    =20, //Exit Rule 2
+   EXIT_MODE_COSTAVERAGING    =40 //Exit Rule 3
   };
 //+------------------------------------------------------------------+
 
@@ -199,6 +200,7 @@ bool CSignalZonedRecovery::CheckMarketCondition(void)
    result = result && CheckMACD();
    return result;
 }
+
 //+------------------------------------------------------------------+
 //| Create indicators.                                               |
 //+------------------------------------------------------------------+
